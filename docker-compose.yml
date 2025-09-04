@@ -1,0 +1,38 @@
+services:
+    symfony:
+        build: .
+        container_name: symfony_app
+        volumes:
+            - .:/app
+        depends_on:
+            - kafka
+        environment:
+            - APP_ENV=dev
+        command: php -S 0.0.0.0:8000 -t public
+        ports:
+            - "8000:8000"
+
+    kafka:
+        image: bitnami/kafka:latest
+        container_name: kafka
+        ports:
+            - "9092:9092"
+        environment:
+            - KAFKA_CFG_NODE_ID=0
+            - KAFKA_CFG_PROCESS_ROLES=broker,controller
+            - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+            - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+            - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+            - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+            - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+
+    kafka-ui:
+        image: provectuslabs/kafka-ui:latest
+        container_name: kafka_ui
+        ports:
+            - "8080:8080"
+        environment:
+            - KAFKA_CLUSTERS_0_NAME=local
+            - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+        depends_on:
+            - kafka
