@@ -12,7 +12,7 @@ class TestKafkaController extends AbstractController
     #[Route('/send-kafka')]
     public function send(KafkaProducer $producer): Response
     {
-        $producer->send('Hello depuis Symfony 7 + Kafka 🚀');
+        $producer->send('🤓 Je suis un message Kafka !');
         return new Response('Message envoyé à Kafka !');
     }
 }

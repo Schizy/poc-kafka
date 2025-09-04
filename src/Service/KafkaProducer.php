@@ -17,7 +17,7 @@ class KafkaProducer
         $context = $factory->createContext();
 
         // 🔹 On définit le topic explicitement ici
-        $topic = $context->createTopic('messages');
+        $topic = $context->createTopic('MyTopic');
 
         $producer = $context->createProducer();
         $producer->send($topic, $context->createMessage($message));
