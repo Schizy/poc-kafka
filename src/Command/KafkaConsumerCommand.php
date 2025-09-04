@@ -11,7 +11,7 @@ use Enqueue\RdKafka\RdKafkaConnectionFactory;
 
 #[AsCommand(
     name: 'kafka:consume',
-    description: 'Add a short description for your command',
+    description: 'Consume messages from Kafka topic',
 )]
 class KafkaConsumerCommand extends Command
 {
@@ -22,23 +22,24 @@ class KafkaConsumerCommand extends Command
         $factory = new RdKafkaConnectionFactory([
             'global' => [
                 'metadata.broker.list' => 'kafka:9092',
-                // Si on ne spécifie pas de groupId Kafka va en générer un
-                // Et comme on aura jamais le même 2x
-                // On ne pourra pas reprendre là où on en était
-                'group.id' => 'symfony-consumer',
+                'group.id' => 'symfony-consumer',   // 👈 stable
+                'enable.auto.commit' => 'false',    // 👈 on force le commit manuel
+                'auto.offset.reset' => 'earliest',  // 👈 lit tout au premier run
+                'session.timeout.ms' => '10000',
+                'max.poll.interval.ms' => '300000',
             ],
         ]);
 
         $context = $factory->createContext();
-
-        // 🔹 Ici aussi, on définit le topic/queue explicitement
         $consumer = $context->createConsumer($context->createQueue('MyTopic'));
 
-        echo "🚀 Waiting for Kafka messages...\n";
+        $io->success("🚀 Waiting for Kafka messages...");
 
         while (true) {
             if ($message = $consumer->receive(5000)) {
                 $io->info("✅ Received: " . $message->getBody());
+
+                // 👇 commit explicite après traitement
                 $consumer->acknowledge($message);
             }
         }
