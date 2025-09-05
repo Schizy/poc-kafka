@@ -32,14 +32,14 @@ class KafkaConsumerCommand extends Command
                 'max-messages',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Nombre maximum de messages à consommer avant arrêt',
+                'Nombre maximum de messages à consommer avant arrêt automatique',
                 0 // 0 = illimité
             )
             ->addOption(
                 'poll-timeout',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Durée d’attente max pour recevoir un message (en ms)',
+                'Durée d’attente pour recevoir un message (en ms) avant de checker si le script doit se stopper',
                 5000 // valeur par défaut = 5 secondes
             );
     }
@@ -48,26 +48,24 @@ class KafkaConsumerCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $maxRuntime   = (int) $input->getOption('max-runtime');
-        $maxMessages  = (int) $input->getOption('max-messages');
-        $pollTimeout  = (int) $input->getOption('poll-timeout');
-        $startTime    = time();
+        $maxRuntime = (int)$input->getOption('max-runtime');
+        $maxMessages = (int)$input->getOption('max-messages');
+        $pollTimeout = (int)$input->getOption('poll-timeout');
+        $startTime = time();
         $messagesConsumed = 0;
 
         // ⚡ Gestion des signaux
-        if (function_exists('pcntl_async_signals')) {
-            pcntl_async_signals(true);
+        pcntl_async_signals(true);
 
-            pcntl_signal(SIGTERM, function () use ($io) {
-                $io->warning("📢 SIGTERM reçu, arrêt après le message en cours...");
-                $this->shouldStop = true;
-            });
+        pcntl_signal(SIGTERM, function () use ($io) {
+            $io->warning("📢 SIGTERM reçu, arrêt après le message en cours...");
+            $this->shouldStop = true;
+        });
 
-            pcntl_signal(SIGINT, function () use ($io) {
-                $io->warning("📢 SIGINT reçu (Ctrl+C), arrêt après le message en cours...");
-                $this->shouldStop = true;
-            });
-        }
+        pcntl_signal(SIGINT, function () use ($io) {
+            $io->warning("📢 SIGINT reçu (Ctrl+C), arrêt après le message en cours...");
+            $this->shouldStop = true;
+        });
 
         $factory = new RdKafkaConnectionFactory([
             'global' => [

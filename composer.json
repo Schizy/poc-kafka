@@ -14,7 +14,8 @@
         "symfony/framework-bundle": "7.3.*",
         "symfony/monolog-bundle": "^3.10",
         "symfony/runtime": "7.3.*",
-        "symfony/yaml": "7.3.*"
+        "symfony/yaml": "7.3.*",
+        "ext-pcntl": "*"
     },
     "config": {
         "allow-plugins": {
