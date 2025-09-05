@@ -1,5 +1,5 @@
 services:
-    symfony:
+    php:
         build: .
         container_name: symfony_app
         volumes:

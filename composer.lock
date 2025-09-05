@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3a8ec9996206ce83e178754aefa7f6a4",
+    "content-hash": "8dbc36d7f6fd168ae6ce00fd00cbb370",
     "packages": [
         {
             "name": "enqueue/rdkafka",
@@ -3792,7 +3792,8 @@
     "platform": {
         "php": ">=8.2",
         "ext-ctype": "*",
-        "ext-iconv": "*"
+        "ext-iconv": "*",
+        "ext-pcntl": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.6.0"
