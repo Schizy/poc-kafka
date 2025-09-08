@@ -2,6 +2,8 @@
 
 namespace App\Command;
 
+use Enqueue\RdKafka\RdKafkaConsumer;
+use Interop\Queue\Consumer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -12,7 +14,7 @@ use Enqueue\RdKafka\RdKafkaConnectionFactory;
 
 #[AsCommand(
     name: 'kafka:consume',
-    description: 'Consume messages from Kafka topic',
+    description: 'Consumes messages from Kafka',
 )]
 class KafkaConsumerCommand extends Command
 {
@@ -23,51 +25,75 @@ class KafkaConsumerCommand extends Command
         $this
             ->addOption(
                 'max-runtime',
-                null,
+                ['t', 'time'],
                 InputOption::VALUE_REQUIRED,
                 'Durée maximale (en secondes) avant arrêt automatique',
                 0 // 0 = illimité
             )
             ->addOption(
                 'max-messages',
-                null,
+                ['m', 'messages'],
                 InputOption::VALUE_REQUIRED,
                 'Nombre maximum de messages à consommer avant arrêt automatique',
                 0 // 0 = illimité
-            )
-            ->addOption(
-                'poll-timeout',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Durée d’attente pour recevoir un message (en ms) avant de checker si le script doit se stopper',
-                5000 // valeur par défaut = 5 secondes
             );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        $this->handleSignals($io);
 
-        $maxRuntime = (int)$input->getOption('max-runtime');
-        $maxMessages = (int)$input->getOption('max-messages');
-        $pollTimeout = (int)$input->getOption('poll-timeout');
         $startTime = time();
+        $maxRuntime = (int)$input->getOption('max-runtime');
+
         $messagesConsumed = 0;
+        $maxMessages = (int)$input->getOption('max-messages');
 
-        // ⚡ Gestion des signaux
-        pcntl_async_signals(true);
+        $consumer = $this->getConsumer();
 
-        pcntl_signal(SIGTERM, function () use ($io) {
-            $io->warning("📢 SIGTERM reçu, arrêt après le message en cours...");
-            $this->shouldStop = true;
-        });
+        $io->success("🚀 Waiting for Kafka messages...");
 
-        pcntl_signal(SIGINT, function () use ($io) {
-            $io->warning("📢 SIGINT reçu (Ctrl+C), arrêt après le message en cours...");
-            $this->shouldStop = true;
-        });
+        while (!$this->shouldStop) {
+            // Vérifie le runtime max
+            if ($maxRuntime > 0 && (time() - $startTime) >= $maxRuntime) {
+                $io->warning("⏰ Durée maximale atteinte ({$maxRuntime}s), arrêt en cours...");
+                break;
+            }
 
-        $factory = new RdKafkaConnectionFactory([
+            // Vérifie le nombre max de messages
+            if ($maxMessages > 0 && $messagesConsumed >= $maxMessages) {
+                $io->warning("📦 Nombre maximum de messages atteint ({$maxMessages}), arrêt en cours...");
+                break;
+            }
+
+            // Le script se bloque complètement 1s le temps que ça écoute Kafka
+            if ($message = $consumer->receive(1000)) {
+                $io->info("✅ Received: " . $message->getBody());
+
+                // On fait semblant de traiter le message
+                $progressBar = $io->createProgressBar(100);
+                for ($i = 0; $i < 5; ++$i) {
+                    sleep(1);
+                    $progressBar->advance(20);
+                }
+
+                $io->newLine(2);
+                $io->note("Message traité après 5s ! ✓");
+
+                $consumer->acknowledge($message);
+                $messagesConsumed++;
+            }
+        }
+
+        $io->success("👋 Arrêt du consumer après {$messagesConsumed} messages.");
+
+        return Command::SUCCESS;
+    }
+
+    private function getConsumer(): Consumer|RdKafkaConsumer
+    {
+        $context = new RdKafkaConnectionFactory([
             'global' => [
                 'metadata.broker.list' => 'kafka:9092',
                 'group.id' => 'symfony-consumer',
@@ -76,52 +102,25 @@ class KafkaConsumerCommand extends Command
                 'session.timeout.ms' => '10000',
                 'max.poll.interval.ms' => '300000',
             ],
-        ]);
+        ])
+            ->createContext();
 
-        $context = $factory->createContext();
-        $consumer = $context->createConsumer($context->createQueue('MyTopic'));
+        return $context->createConsumer($context->createQueue('MyTopic'));
+    }
 
-        $io->success("🚀 Waiting for Kafka messages... (poll-timeout = {$pollTimeout} ms)");
+    private function handleSignals(SymfonyStyle $io): void
+    {
+        // ⚡ Gestion des signaux
+        pcntl_async_signals(true);
 
-        while (!$this->shouldStop) {
-            // Vérifie le runtime max
-            if ($maxRuntime > 0 && (time() - $startTime) >= $maxRuntime) {
-                $io->warning("⏰ Durée maximale atteinte ({$maxRuntime}s), arrêt en cours...");
-                $this->shouldStop = true;
-                break;
-            }
+        pcntl_signal(SIGTERM, function () use ($io) {
+            $io->warning("📢 SIGTERM reçu, arrêt gracieux après le message en cours...");
+            $this->shouldStop = true;
+        });
 
-            // Vérifie le nombre max de messages
-            if ($maxMessages > 0 && $messagesConsumed >= $maxMessages) {
-                $io->warning("📦 Nombre maximum de messages atteint ({$maxMessages}), arrêt en cours...");
-                $this->shouldStop = true;
-                break;
-            }
-
-            if ($message = $consumer->receive($pollTimeout)) {
-                $io->info("✅ Received: " . $message->getBody());
-
-                // 👇 traitement du message
-                $consumer->acknowledge($message);
-
-                $messagesConsumed++;
-            }
-        }
-
-        // 👇 Commit final avant de quitter
-        try {
-            if (method_exists($consumer, 'commit')) {
-                $consumer->commit();
-                $io->success("💾 Offset commit final effectué avant l'arrêt.");
-            } elseif (method_exists($consumer, 'commitAsync')) {
-                $consumer->commitAsync();
-                $io->success("💾 Offset commit final (async) effectué avant l'arrêt.");
-            }
-        } catch (\Throwable $e) {
-            $io->error("❌ Impossible de faire le commit final : " . $e->getMessage());
-        }
-
-        $io->success("👋 Arrêt propre du consumer après {$messagesConsumed} messages.");
-        return Command::SUCCESS;
+        pcntl_signal(SIGINT, function () use ($io) {
+            $io->warning("📢 SIGINT reçu (Ctrl+C), arrêt gracieux après le message en cours...");
+            $this->shouldStop = true;
+        });
     }
 }
