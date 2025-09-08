@@ -13,6 +13,7 @@ class TestKafkaController extends AbstractController
     public function send(KafkaProducer $producer): Response
     {
         $producer->send('🤓 Je suis un message Kafka !');
+
         return new Response('Message envoyé à Kafka !');
     }
 }

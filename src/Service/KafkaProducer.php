@@ -3,10 +3,22 @@
 namespace App\Service;
 
 use Enqueue\RdKafka\RdKafkaConnectionFactory;
+use Enqueue\RdKafka\RdKafkaContext;
 
 class KafkaProducer
 {
     public function send(string $message): void
+    {
+        $context = $this->getContext();
+        $producer = $context->createProducer();
+
+        $producer->send(
+            $context->createTopic('MyTopic'),
+            $context->createMessage($message)
+        );
+    }
+
+    private function getContext(): RdKafkaContext
     {
         $factory = new RdKafkaConnectionFactory([
             'global' => [
@@ -14,12 +26,6 @@ class KafkaProducer
             ],
         ]);
 
-        $context = $factory->createContext();
-
-        // 🔹 On définit le topic explicitement ici
-        $topic = $context->createTopic('MyTopic');
-
-        $producer = $context->createProducer();
-        $producer->send($topic, $context->createMessage($message));
+        return $factory->createContext();
     }
 }

@@ -1,16 +1,12 @@
 services:
     php:
         build: .
-        container_name: symfony_app
-        volumes:
-            - .:/app
-        depends_on:
-            - kafka
-        environment:
-            - APP_ENV=dev
-        command: php -S 0.0.0.0:8000 -t public
+        container_name: php
         ports:
             - "8000:8000"
+        volumes:
+            - .:/app
+        command: php -S 0.0.0.0:8000 -t public
 
     kafka:
         image: bitnami/kafka:latest
@@ -28,11 +24,9 @@ services:
 
     kafka-ui:
         image: provectuslabs/kafka-ui:latest
-        container_name: kafka_ui
+        container_name: kafka-ui
         ports:
             - "8080:8080"
         environment:
             - KAFKA_CLUSTERS_0_NAME=local
             - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-        depends_on:
-            - kafka
