@@ -17,9 +17,9 @@ class KafkaConsumerCommand
 
     public function __invoke(
         SymfonyStyle $io,
-        #[Option(description: 'Durée maximale (en secondes) avant arrêt automatique', name: 'max-runtime', shortcut: 't')]
+        #[Option(description: 'Durée maximale (en secondes) avant arrêt automatique', shortcut: 't')]
         int $maxRuntime = 0,
-        #[Option(description: 'Nombre maximum de messages à consommer avant arrêt automatique', name: 'max-messages', shortcut: 'm')]
+        #[Option(description: 'Nombre maximum de messages à consommer avant arrêt automatique', shortcut: 'm')]
         int $maxMessages = 0
     ): int
     {
