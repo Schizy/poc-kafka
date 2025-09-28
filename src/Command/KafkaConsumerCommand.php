@@ -5,50 +5,28 @@ namespace App\Command;
 use Enqueue\RdKafka\RdKafkaConsumer;
 use Interop\Queue\Consumer;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Enqueue\RdKafka\RdKafkaConnectionFactory;
 
-#[AsCommand(
-    name: 'kafka:consume',
-    description: 'Consumes messages from Kafka',
-)]
-class KafkaConsumerCommand extends Command
+#[AsCommand(name: 'kafka:consume', description: 'Consumes messages from Kafka')]
+class KafkaConsumerCommand
 {
     private bool $shouldStop = false;
 
-    protected function configure(): void
+    public function __invoke(
+        SymfonyStyle $io,
+        #[Option(description: 'Durée maximale (en secondes) avant arrêt automatique', name: 'max-runtime', shortcut: 't')]
+        int $maxRuntime = 0,
+        #[Option(description: 'Nombre maximum de messages à consommer avant arrêt automatique', name: 'max-messages', shortcut: 'm')]
+        int $maxMessages = 0
+    ): int
     {
-        $this
-            ->addOption(
-                'max-runtime',
-                ['t', 'time'],
-                InputOption::VALUE_REQUIRED,
-                'Durée maximale (en secondes) avant arrêt automatique',
-                0 // 0 = illimité
-            )
-            ->addOption(
-                'max-messages',
-                ['m', 'messages'],
-                InputOption::VALUE_REQUIRED,
-                'Nombre maximum de messages à consommer avant arrêt automatique',
-                0 // 0 = illimité
-            );
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $io = new SymfonyStyle($input, $output);
         $this->handleSignals($io);
 
         $startTime = time();
-        $maxRuntime = (int)$input->getOption('max-runtime');
-
         $messagesConsumed = 0;
-        $maxMessages = (int)$input->getOption('max-messages');
 
         $consumer = $this->getConsumer();
 
@@ -114,11 +92,13 @@ class KafkaConsumerCommand extends Command
         pcntl_async_signals(true);
 
         pcntl_signal(SIGTERM, function () use ($io) {
+            $io->newLine(2);
             $io->warning("📢 SIGTERM reçu, arrêt gracieux après le message en cours...");
             $this->shouldStop = true;
         });
 
         pcntl_signal(SIGINT, function () use ($io) {
+            $io->newLine(2);
             $io->warning("📢 SIGINT reçu (Ctrl+C), arrêt gracieux après le message en cours...");
             $this->shouldStop = true;
         });
