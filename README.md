@@ -16,11 +16,11 @@ How to consume messages:
 Options:
 ========
 
-- `-t` or `-time` or `--max-runtime` to set a max time (in seconds) before the consumer quits
-- `-m` or `-messages` or `--max-messages` to set a max number of messages before the consumer quits
+- `-t` or `--max-runtime` to set a max time (in seconds) before the consumer quits
+- `-m` or `--max-messages` to set a max number of messages before the consumer quits
 
-/!\ The consumer will NEVER quit while a message is still processing, it will quit before the next message
+⚠️ The consumer will NEVER quit while a message is still processing, it will quit gracefully when the message is done.
 
-Signals:
+⚡️Signals:
 ========
-If we send `SIGINT` with `ctrl+c` or `SIGTERM` with `kill`, the consumer will stop gracefully after the current message is done
+If we send `SIGINT` with `ctrl+c` or `SIGTERM` with `kill`, the consumer will still stop gracefully after the current message is done
